@@ -1,3 +1,4 @@
+# I still have not learnt how to actually use the Makefile to track header dependency and integrate it into the compiler process
 CC		:= gcc
 CFLAGS	:= -Wall -Wextra -Werror -g -Iinclude
 

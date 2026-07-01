@@ -30,7 +30,7 @@ int main () {
         perror("getaddrinfo error");
         exit(1);
     }
-
+    // just sticking to using the very first sockadrr that was found
     listen_fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 
     int yes = 1;
@@ -53,6 +53,7 @@ int main () {
 
     while (1) {
         ready_set = master_set;
+        // setting fd_max+1 due to zero indexing.
         if (select(fd_max +1, &ready_set, NULL, NULL, NULL) == -1) {
             perror("select exception occurred");
             exit(1);
@@ -79,9 +80,13 @@ int main () {
                         printf("[Server] Socket %d disconnected.\n", i);
                         close(i);
                         FD_CLR(i, &master_set);
+                        
+                        if (FD_ISSET(i, &master_set) == 0 && fd_max > listen_fd) {
+                            fd_max--; // reducing the max numbers of fds being monitored.
+                        }
                     }
                     else {
-                        // Process data: Echo it right back to them!
+                        // process and echo message back
                         printf("[Socket %d sent]: %s", i, buffer);
                         send(i, buffer, bytes_received, 0);
                     }

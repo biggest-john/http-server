@@ -1,31 +1,22 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <sys/socket.h>
+#include <signal.h>
 #include "../include/server.h"
 
 int main(void) {
-    printf("Initializing core socket server...\n");
+    keep_running = 1; // initializing the main while loop control variable.
 
-    const int listen_fd = create_listening_socket();
-    if (listen_fd == -1) {
-        fprintf(stderr, "Failed to initialize listening socket.\n");
+    if (mapper_custom_sig_handlers(SIGINT, handle_shutdown) == -1) {
+        perror("Cannot map the SIGINT handler");
+        exit(3);
+    }
+    const int server_status = accept_connections();
+    if (server_status == -1) {
+        printf("Server shutdown due to error\n");
         return 1;
     }
-    printf("Server successfully listening on port %s!\n", PORT);
-
-    while (1) {
-        struct sockaddr_storage client;
-        socklen_t client_size  = sizeof(client);
-
-        const int client_fd = accept(listen_fd, (struct sockaddr *) &client, &client_size);
-
-        if (client_fd == -1) {
-            perror("client_fd");
-            return 1;
-        }
-
-        handle_client_echo(client_fd);
-    }
-    close(listen_fd); // this is unreachable, would implement graceful shutdown soon.
+    printf("Server shutdown gracefully.\n");
     return 0;
 }
