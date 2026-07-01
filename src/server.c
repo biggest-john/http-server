@@ -45,17 +45,20 @@ int create_listening_socket() {
         break; // break successfully on first complete combination of socket and binding.
     }
     if (p == NULL) {
+        freeaddrinfo(res);
         fprintf(stderr, "server: failed to bind socket\n");
         return -1;
     }
 
     if (listen(sock_fd, BACKLOG) == -1) {
         perror("listen");
+        freeaddrinfo(res);
         close(sock_fd);
         p = NULL;
         return -1;
     }
     p = NULL;
+    freeaddrinfo(res);
     return sock_fd;
 }
 
@@ -116,7 +119,7 @@ int accept_connections() {
     while (keep_running) {
         int poll_count = poll(pfds, num_fds, -1);
         if (poll_count < 0) {
-            perror("failed to setup poll correctly !");
+            perror("failed to setup poll correctly");
             break;
         }
 

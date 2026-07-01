@@ -6,7 +6,7 @@
 
 void handle_shutdown(int sig) {
     // functon to handle the shutdown of the server ^C.
-    printf("SIGINT: %i\n", sig);
+    printf("\nSIGINT: %i\n", sig);
     keep_running = 0; // sets main loop control to enable handling graceful shutdown
 }
 
