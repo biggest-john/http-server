@@ -11,7 +11,7 @@ int create_listening_socket() {
     struct addrinfo hints, *res, *p;
     int status, sock_fd, yes = 1; // yes for socket reuse option.
 
-    memset(&hints, 0, sizeof(hints));
+    memset(&hints, 0, sizeof(hints)); // pre-setting the struct to empty
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;
@@ -31,10 +31,11 @@ int create_listening_socket() {
             perror("setsocketopt");
             close(sock_fd);
             freeaddrinfo(res);
+            res = NULL;
             return -1;
         }
 
-        if(bind(sock_fd, p->ai_addr, p->ai_addrlen) == 1) {
+        if(bind(sock_fd, p->ai_addr, p->ai_addrlen) == -1) {
             close(sock_fd);
             continue;
         }
@@ -53,4 +54,23 @@ int create_listening_socket() {
     }
 
     return sock_fd;
+}
+
+void handle_client_echo(const int client_fd) {
+    char buff[1024] = {0};
+    int bytes_read = recv(client_fd, buff, sizeof(buff) - 1, 0);
+
+    if (bytes_read < 0) {
+        perror("recv");
+    } else if ( bytes_read == 0) {
+        printf("client closed the connection!\n");
+    }else {
+        buff[bytes_read] = '\0';
+        printf("Received: %s\n", buff);
+
+        if (send(client_fd, buff, sizeof(buff), 0) == -1) {
+            perror("send");
+        }
+    }
+    close(client_fd);
 }

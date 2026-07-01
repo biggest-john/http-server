@@ -9,5 +9,6 @@
  * Returns the listening socket values or -1 (in the case of an error)
  */
 int create_listening_socket();
+void handle_client_echo(int client_fd);
 
 #endif
