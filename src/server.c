@@ -68,6 +68,10 @@ static int handle_client_echo(int pollfd_index, int *num_fds, struct pollfd *pfd
 
     if (bytes_read < 0) {
         perror("Receive Error");
+        close(pfds[pollfd_index].fd);
+        pfds[pollfd_index] = pfds[*num_fds - 1];
+        (*num_fds)--;
+        return 1; // Signal a swap happened so the caller can adjust i--
     }
     else if (bytes_read == 0) {
         printf("client closed the connection!\n");
@@ -94,7 +98,7 @@ int accept_connections() {
      */
 
     printf("Initializing core socket server...\n");
-    struct pollfd *pfds = calloc(MAX_CONNECTIONS, sizeof(*pfds));
+    struct pollfd *pfds = calloc(MAX_CONNECTION, sizeof(*pfds));
 
     const int listen_fd = create_listening_socket();
     if (listen_fd == -1) {
@@ -108,7 +112,7 @@ int accept_connections() {
     socklen_t client_size;
 
     //setting all fd to -1
-    for (int i=0; i<MAX_CONNECTIONS; i++) {
+    for (int i=0; i<MAX_CONNECTION; i++) {
         pfds[i].fd = -1;
     }
 
@@ -136,7 +140,7 @@ int accept_connections() {
                         perror("accept error");
                     }
                     else {
-                        if (num_fds < MAX_CONNECTIONS){
+                        if (num_fds < MAX_CONNECTION){
                             pfds[num_fds].fd = new_client_fd;
                             pfds[num_fds].events = POLLIN;
                             num_fds++;
@@ -144,7 +148,26 @@ int accept_connections() {
                             printf("[Server] Connection accepted on fd %d\n", new_client_fd);
                         }
                         else {
-                            printf("[Server] max connections reached: connect accept new connection.\n");
+                            printf("[Server] max connections reached: Growing the pollfd set...\n");
+                            const int new_limit  = MAX_CONNECTION * 2;
+                            struct pollfd *temp_pfds = realloc(pfds, sizeof(*pfds) *  new_limit);
+                            if (temp_pfds == NULL) {
+                                perror("[REALLOC FAILED] - Server out of memory...\n");
+                                close(new_client_fd);
+                            }
+                            MAX_CONNECTION = new_limit;
+                            pfds = temp_pfds;
+
+                            for (int j = num_fds; j < MAX_CONNECTION; j++) { // initializing fds of new pollfd slots.
+                                pfds[j].fd = -1;
+                            }
+                            temp_pfds = NULL;
+                            pfds[num_fds].fd = new_client_fd;
+                            pfds[num_fds].events = POLLIN;
+                            num_fds++;
+
+                            printf("[REALLOC SUCCESSFUL]");
+                            printf("[Server] Connection accepted on fd %d\n", new_client_fd);
                         }
                     }
                 }

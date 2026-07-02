@@ -5,14 +5,13 @@
 
 #define PORT "8080"
 #define BACKLOG 10
-#define MAX_CONNECTIONS 100
 #define CLIENT_MSG_BUFF_SIZE 1024
 /*
  * creates,bind and starts listening on a TCP socket.
  * suports both IPv4 and IPv6 via dual stack mapping
  * Returns the listening socket values or -1 (in the case of an error)
  */
-
+extern  int MAX_CONNECTION;
 extern volatile sig_atomic_t keep_running; // main loop control variable.
 
 //  server.c functions

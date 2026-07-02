@@ -6,7 +6,7 @@
 #include "../include/server.h"
 
 volatile sig_atomic_t keep_running = 1; // initializing the main while loop control variable.
-
+int MAX_CONNECTION = 3;
 
 int main(void) {
     if (mapper_custom_sig_handlers(SIGINT, handle_shutdown) == -1) {
