@@ -1,3 +1,6 @@
+/*
+ * when faced with recv() errors, I just close the file descriptor, would figure out a better way to handle this later
+ */
 #include  <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -11,7 +14,8 @@
 
 int create_listening_socket() {
     struct addrinfo hints, *res, *p;
-    int status, sock_fd = -1, yes = 1; // yes for socket reuse option.
+    int status, sock_fd = -1;
+    const int yes = 1; // yes for socket reuse option.
 
     memset(&hints, 0, sizeof(hints)); // pre-setting the struct to empty
     hints.ai_family = AF_UNSPEC;
@@ -62,41 +66,45 @@ int create_listening_socket() {
     return sock_fd;
 }
 
-static int handle_client_echo(int pollfd_index, int *num_fds, struct pollfd *pfds) {
-    char buff[CLIENT_MSG_BUFF_SIZE] = {0};
-    ssize_t bytes_read = recv(pfds[pollfd_index].fd, buff, sizeof(buff) - 1, 0);
+static int handle_client(int pollfd_index, int *num_fds, struct pollfd *pfds) {
+    char recv_buff[RECV_BUFF_SIZE] = {};
+    ssize_t bytes_recvd = recv(pfds[pollfd_index].fd, recv_buff, sizeof(recv_buff), 0); //not subtracting one from buffer size
+                                                                     //because no '\0' will be there, it is just a stream of bytes
 
-    if (bytes_read < 0) {
+    if (bytes_recvd < 0) { // avoid merging this with connection closed because I hope to implement handling it later
         perror("Receive Error");
         close(pfds[pollfd_index].fd);
         pfds[pollfd_index] = pfds[*num_fds - 1];
+        pfds[*num_fds - 1].fd = -1; pfds[*num_fds - 1].events = 0; pfds[*num_fds - 1].revents = 0;
         (*num_fds)--;
         return 1; // Signal a swap happened so the caller can adjust i--
     }
-    else if (bytes_read == 0) {
+    else if (bytes_recvd == 0) {
         printf("client closed the connection!\n");
         close(pfds[pollfd_index].fd);
         pfds[pollfd_index] = pfds[*num_fds - 1]; // shrinking the coverage size and mending the hole.
+        pfds[*num_fds - 1].fd = -1; pfds[*num_fds - 1].events = 0; pfds[*num_fds - 1].revents = 0;
         (*num_fds)--;
-        return 1; // To signal the outer function that one client disconnected and we need to adjust i--.
-    }
+        return 1; // Signal a swap happened so the caller can adjust i--
     else {
-        buff[bytes_read] = '\0';
-        printf("Received: %s\n", buff);
-
-        if (send(pfds[pollfd_index].fd, buff, bytes_read, 0) == -1) {
+        http_parser(recv_buff, bytes_recvd);
+        /*
+         * char *http_body = "<html><body>Hello World!</body></html>";
+        char send_buff[SEND_BUFF_SIZE] = {0};
+        const size_t send_size = snprintf(send_buff, SEND_BUFF_SIZE,  "HTTP/1.1 200 OK\r\n"
+                                                                      "Content-Type: text/html\r\n"
+                                                                      "Content-Length: %zu\r\n"
+                                                                      "\r\n"
+                                                                      "%s", strlen(http_body), http_body);
+        if (send(pfds[pollfd_index].fd, send_buff, send_size, 0) == -1) {
             perror("send");
         }
+        */
     }
     return 0;
 }
 
 int accept_connections() {
-    /* function to accept new connections and also client requests. A positive return value can mean there was a poll issue
-     *  or an SIGINT signal was sent, in both case, we shut the server gracefully. A negative response simply mean there
-     *  an issue getting the listening fd.
-     */
-
     printf("Initializing core socket server...\n");
     struct pollfd *pfds = calloc(MAX_CONNECTION, sizeof(*pfds));
 
@@ -122,7 +130,7 @@ int accept_connections() {
 
     while (keep_running) {
         int poll_count = poll(pfds, num_fds, -1);
-        if (poll_count < 0) {
+        if (poll_count < 0) {// this can actually be handled more robustly. 
             perror("failed to setup poll correctly");
             break;
         }
@@ -152,8 +160,9 @@ int accept_connections() {
                             const int new_limit  = MAX_CONNECTION * 2;
                             struct pollfd *temp_pfds = realloc(pfds, sizeof(*pfds) *  new_limit);
                             if (temp_pfds == NULL) {
-                                perror("[REALLOC FAILED] - Server out of memory...\n");
+                                perror("[REALLOC FAILED] - Server out of memory...\nCannot accept any new client at moment! ");
                                 close(new_client_fd);
+                                continue;
                             }
                             MAX_CONNECTION = new_limit;
                             pfds = temp_pfds;
@@ -174,7 +183,8 @@ int accept_connections() {
             }
             else {
                 if ( pfds[i].revents & POLLIN) {
-                   if (handle_client_echo(i, &num_fds, pfds) == 1) {
+                   if (handle_client(i, &num_fds, pfds) == 1) {
+                       //adjusting the "i" counter so that it actually reflects the just swapped pfds
                        i--;
                    }
 

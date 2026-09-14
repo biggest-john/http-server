@@ -5,12 +5,15 @@
 
 #define PORT "8080"
 #define BACKLOG 10
-#define CLIENT_MSG_BUFF_SIZE 1024
-/*
- * creates,bind and starts listening on a TCP socket.
- * suports both IPv4 and IPv6 via dual stack mapping
- * Returns the listening socket values or -1 (in the case of an error)
- */
+#define RECV_BUFF_SIZE 1024
+#define SEND_BUFF_SIZE 1024
+
+struct HTTP_Request {
+    char method[16];
+    char path[2048];
+    char version[16];
+};
+
 extern  int MAX_CONNECTION;
 extern volatile sig_atomic_t keep_running; // main loop control variable.
 
@@ -21,4 +24,7 @@ int accept_connections();
 // sig_handler.c functions
 int mapper_custom_sig_handlers(int sig, void (*handler) (int));
 void handle_shutdown(int sig);
+
+// http_parser.c functions
+void http_parser(char request_payload[], size_t payload_size);
 #endif
